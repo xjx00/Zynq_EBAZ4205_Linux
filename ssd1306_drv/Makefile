@@ -7,4 +7,4 @@ all:
 clean:
 	make -C $(KERN_DIR) M=`pwd` modules clean
 
-obj-m += ssd1306.o
+obj-m += ssd1306s.o

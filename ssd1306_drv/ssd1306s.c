@@ -1,13 +1,49 @@
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>
-#include <linux/device.h>
-#include <linux/capability.h>
-#include <linux/jiffies.h>
-#include <linux/i2c.h>
-#include <linux/mutex.h> 
-#include <linux/uaccess.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
+#include <linux/ioctl.h>
+#include <linux/mm.h>
+#include <asm/uaccess.h>
+#include <linux/blkdev.h>
+ 
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/kdev_t.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+
+#include <linux/major.h>
+#include <linux/errno.h>
+#include <linux/module.h>
+#include <linux/seq_file.h>
+
+#include <linux/kobject.h>
+#include <linux/kobj_map.h>
+#include <linux/cdev.h>
+#include <linux/mutex.h>
+#include <linux/backing-dev.h>
+#include <linux/tty.h> 
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/hrtimer.h>
+#include <linux/i2c.h>
+#include <linux/input.h>
+#include <linux/interrupt.h>
+#include <linux/io.h>
+#include <linux/platform_device.h>
+#include <linux/async.h>
+#include <linux/irq.h>
+#include <linux/workqueue.h>
+#include <linux/proc_fs.h>
+#include <linux/input/mt.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
+#include <linux/slab.h>
+#include <linux/device.h>
+
 #include "SSD1306.h"
 
 #define DEVICE_NAME "ssd1306"
@@ -17,6 +53,8 @@ static struct class *drv_class;
 static struct cdev *chr_dev;
 static struct device *device;
 static dev_t devnum;
+
+static struct kobject *ssd1306_kobj;
 
 /**************************************************************************/
 void SSD1306_init(void)
@@ -270,6 +308,61 @@ void SSD1306_setInverseDisplay()
 }
 
 /***************************************************************************/
+static ssize_t foo_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf){
+    *buf = "123";
+    return 0;
+}
+
+static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count){
+
+    unsigned char i=0;
+    unsigned int cmd = 0;
+    unsigned int x = 0;
+    unsigned int y = 0;
+    unsigned char str[16];
+
+    printk("received:%s \n",buf);
+    sscanf(buf,"%d,%d,%d,%s",&cmd,&x,&y,str);
+    //判断收到的命令
+    switch(cmd){
+        case 0:
+            SSD1306_clearDisplay();
+            SSD1306_setTextXY(x,y);
+            for(i=0;i<16;i++)
+            {
+                SSD1306_putChar(str[i]);     
+            }
+            break;
+        case 1:
+            SSD1306_setTextXY(x,y);
+            for(i=0;i<16;i++)
+            {
+                SSD1306_putChar(str[i]);     
+            }
+            break;
+        default:
+            SSD1306_clearDisplay();
+            break;
+    }
+    return count;
+}
+
+static struct kobj_attribute foo_attribute =
+__ATTR(ssd1306, 0664, foo_show, foo_store);
+
+static struct attribute *attrs[] = {
+    &foo_attribute.attr,
+    NULL,  /* 需要用NULL来表示属性列表的结束 */
+};
+
+static struct attribute_group attr_group = {
+    .attrs = attrs,
+};
+
+
+
+
+/**************************************************************************/
 static int ssd1306_open(struct inode *inodep, struct file *filep){
     filep->private_data = ssd1306_client;
     return 0;
@@ -314,6 +407,16 @@ static int ssd1306_probe(struct i2c_client *client, const struct i2c_device_id *
     printk(KERN_INFO"ssd1306 driver is loaded");
     ssd1306_client = client;
 
+    /***********************************/
+    ssd1306_kobj = kobject_create_and_add("ssd1306", kernel_kobj);
+    if(!ssd1306_kobj)
+        return -ENOMEM;
+
+    ret = sysfs_create_group(ssd1306_kobj, &attr_group);
+    if(ret)
+        kobject_put(ssd1306_kobj); 
+
+    /**********************************/
     ret = alloc_chrdev_region(&devnum, 0 , 1, "ssd1306" );
     if(ret < 0) {
         printk(KERN_ERR"alloc_chrdev_region fail\n");
@@ -370,7 +473,8 @@ static int ssd1306_remove(struct i2c_client *client)
     class_destroy(drv_class);
     cdev_del(chr_dev);
     unregister_chrdev_region(devnum, 1);
- 
+    
+    kobject_put(ssd1306_kobj);
     return 0;
 }
 
