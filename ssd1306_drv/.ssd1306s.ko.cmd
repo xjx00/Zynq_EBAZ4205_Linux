@@ -1,1 +1,0 @@
-cmd_/root/zynq/Zynq_EBAZ4205_Linux/ssd1306_drv/ssd1306s.ko := arm-linux-gnueabihf-ld -r  -EL -T ./scripts/module-common.lds -T ./arch/arm/kernel/module.lds  --build-id  -o /root/zynq/Zynq_EBAZ4205_Linux/ssd1306_drv/ssd1306s.ko /root/zynq/Zynq_EBAZ4205_Linux/ssd1306_drv/ssd1306s.o /root/zynq/Zynq_EBAZ4205_Linux/ssd1306_drv/ssd1306s.mod.o ;  true
